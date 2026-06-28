@@ -21,10 +21,22 @@ CHAT_HISTORY: dict[str, list[dict]] = {}
 
 class PropertyChatService:
     def __init__(self):
-        self.model = ChatGoogleGenerativeAI(
-            api_key=settings.gemini_api_key,
-            model="models/gemini-2.5-flash",
-        )
+        print("settings" , settings)
+        if settings.gemini_provider == "vertex":
+            model_name = settings.gemini_model or "gemini-2.5-flash"
+            self.model = ChatGoogleGenerativeAI(
+                model=model_name,
+                api_key=settings.gemini_api_key or None,
+                vertexai=True,
+                project=settings.google_cloud_project or None,
+                location=settings.google_cloud_location or None,
+            )
+        else:
+            model_name = settings.gemini_model or "models/gemini-2.5-flash"
+            self.model = ChatGoogleGenerativeAI(
+                api_key=settings.gemini_api_key,
+                model=model_name,
+            )
         self._supabase: Client | None = None
 
     def create_or_resume_lead(self, payload: PropertyLeadCreateRequest) -> PropertyLeadResponse:

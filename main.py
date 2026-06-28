@@ -1,3 +1,6 @@
+import os
+os.environ["WEBSOCKETS_MAX_LINE_LENGTH"] = "16384"
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
