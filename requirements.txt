@@ -7,3 +7,5 @@ langchain-google-genai
 pydantic
 supabase
 razorpay
+httpx
+cryptography

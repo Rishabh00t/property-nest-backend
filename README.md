@@ -109,3 +109,71 @@ invoices across all tenants. Requires the `super_admin` role.
 `POST /billing/webhook` — Razorpay webhook receiver. Verifies
 `X-Razorpay-Signature` against the raw body and is idempotent per
 `X-Razorpay-Event-Id`.
+
+## WhatsApp chatbot (multi-builder)
+
+Each builder connects **their own** WhatsApp Business number from
+*Admin → WhatsApp Bot*. An AI assistant (Gemini, same config as the website
+chat) answers buyers about that builder's projects, creates CRM leads
+(source `WhatsApp`), and hands chats to a human on request.
+
+### How messages are routed between builders
+
+```
+Buyer ──WhatsApp──▶ Meta ──POST /whatsapp/webhook──▶ backend
+                                 │  value.metadata.phone_number_id
+                                 ▼
+             whatsapp_accounts (phone_number_id UNIQUE) ──▶ builder_id
+                                 │
+        conversation / messages / lead are all stamped with builder_id
+                                 │
+              reply is sent from that builder's number with their token
+```
+
+* One webhook URL serves every builder; the receiving number decides the builder.
+* A number can only be connected to one workspace (`409` otherwise).
+* The same buyer messaging two builders gets two separate conversations.
+* Every admin endpoint filters by the caller's id, and Supabase RLS limits
+  direct reads/Realtime to `builder_id = auth.uid()`.
+* Signatures (`X-Hub-Signature-256`) are verified per builder: with their own
+  Meta app's secret if they saved one, otherwise the platform `WHATSAPP_APP_SECRET`.
+* Access tokens / app secrets are Fernet-encrypted (`ENCRYPTION_KEY`) and never
+  returned to the browser.
+* Webhook retries are de-duplicated by Meta's message id (`wa_message_id` UNIQUE).
+* Chat history lives in Postgres (not memory), so it works on serverless/Vercel.
+
+### Required environment variables
+
+```bash
+WHATSAPP_VERIFY_TOKEN=...   # platform Meta app (optional if every builder uses their own app)
+WHATSAPP_APP_SECRET=...     # platform Meta app secret
+PUBLIC_BACKEND_URL=https://<this-backend>
+ENCRYPTION_KEY=...          # python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+WHATSAPP_GRAPH_VERSION=v21.0
+```
+
+### One-time setup
+
+1. Apply the `create_whatsapp_chatbot` Supabase migration.
+2. Set the env vars above and redeploy.
+3. Each builder: Admin → WhatsApp Bot → Connection → paste Phone number ID +
+   permanent access token, then copy the shown Callback URL and Verify token
+   into their Meta app (WhatsApp → Configuration → Webhook) and subscribe to
+   the `messages` field.
+
+### Endpoints
+
+`GET /whatsapp/webhook` — Meta verification handshake (platform or per-builder verify token).
+
+`POST /whatsapp/webhook` — incoming messages and delivery statuses for all builders.
+
+Builder-only (`Authorization: Bearer <supabase token>`, role `admin`):
+
+`GET | PUT | DELETE /whatsapp/account` — connection + bot settings (masked secrets).
+`POST /whatsapp/account/test` — checks the credentials against the Graph API.
+`POST /whatsapp/account/rotate-verify-token`
+
+`GET /whatsapp/conversations?status=bot|human|closed`
+`GET /whatsapp/conversations/{id}/messages` — thread + `can_reply` (24h window), clears unread.
+`POST /whatsapp/conversations/{id}/messages` — `{ body }` agent reply; pauses the bot for that chat.
+`PATCH /whatsapp/conversations/{id}` — `{ status }` take over / hand back / close.

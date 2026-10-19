@@ -22,6 +22,17 @@ class Settings:
     razorpay_key_id: str = os.getenv("RAZORPAY_KEY_ID", "")
     razorpay_key_secret: str = os.getenv("RAZORPAY_KEY_SECRET", "")
     razorpay_webhook_secret: str = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
+    # WhatsApp Cloud API (multi-builder chatbot). The verify token / app secret
+    # here belong to the *platform's* Meta app; builders who bring their own
+    # Meta app store their own per-account values instead.
+    whatsapp_graph_version: str = os.getenv("WHATSAPP_GRAPH_VERSION", "v21.0")
+    whatsapp_verify_token: str = os.getenv("WHATSAPP_VERIFY_TOKEN", "")
+    whatsapp_app_secret: str = os.getenv("WHATSAPP_APP_SECRET", "")
+    # Public https URL of this backend, used to show builders their webhook URL.
+    public_backend_url: str = os.getenv("PUBLIC_BACKEND_URL", "")
+    # Fernet key used to encrypt WhatsApp access tokens at rest. Generate with:
+    # python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    encryption_key: str = os.getenv("ENCRYPTION_KEY", "")
     cors_origins: list[str] = field(
         default_factory=lambda: [
             "http://localhost:8080",
