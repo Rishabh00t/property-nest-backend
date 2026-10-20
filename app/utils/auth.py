@@ -76,3 +76,10 @@ async def require_super_admin(current_user: CurrentUser = Depends(get_current_us
     if current_user.role != "super_admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Super admin access required.")
     return current_user
+
+
+async def require_builder(current_user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
+    """Builder workspace routes. The builder's own profile id is the tenant id."""
+    if current_user.role not in ("admin", "super_admin"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Builder access required.")
+    return current_user
