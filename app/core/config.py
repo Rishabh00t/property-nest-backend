@@ -19,6 +19,9 @@ class Settings:
     google_cloud_location: str = os.getenv("GOOGLE_CLOUD_LOCATION", os.getenv("GCP_LOCATION", "us-central1"))
     supabase_url: str = os.getenv("SUPABASE_URL", "")
     supabase_service_role_key: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    razorpay_key_id: str = os.getenv("RAZORPAY_KEY_ID", "")
+    razorpay_key_secret: str = os.getenv("RAZORPAY_KEY_SECRET", "")
+    razorpay_webhook_secret: str = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
     cors_origins: list[str] = field(
         default_factory=lambda: [
             "http://localhost:8080",
@@ -36,6 +39,10 @@ class Settings:
     @property
     def has_supabase(self) -> bool:
         return bool(self.supabase_url and self.supabase_service_role_key)
+
+    @property
+    def has_razorpay(self) -> bool:
+        return bool(self.razorpay_key_id and self.razorpay_key_secret)
 
 
 settings = Settings()
