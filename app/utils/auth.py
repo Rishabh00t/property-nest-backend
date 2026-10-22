@@ -83,3 +83,34 @@ async def require_builder(current_user: CurrentUser = Depends(get_current_user))
     if current_user.role not in ("admin", "super_admin"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Builder access required.")
     return current_user
+
+
+def builder_has_feature(builder_id: str, feature_key: str) -> bool:
+    """Effective per-builder feature flag (super admin → Feature Access).
+    Fails open if the flags table/function isn't there yet, so a missing
+    migration never takes a feature down for everyone."""
+    try:
+        result = _get_admin_client().rpc(
+            "builder_has_feature", {"_builder_id": builder_id, "_feature_key": feature_key}
+        ).execute()
+    except HTTPException:
+        raise
+    except Exception as error:
+        print(f"Feature flag lookup failed for {feature_key}: {error}")
+        return True
+    return result.data is not False
+
+
+def require_feature(feature_key: str):
+    """Dependency: builder route that is only available when the super admin
+    has enabled `feature_key` for this builder. Super admins always pass."""
+
+    async def dependency(current_user: CurrentUser = Depends(require_builder)) -> CurrentUser:
+        if current_user.role != "super_admin" and not builder_has_feature(current_user.id, feature_key):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This feature is not enabled for your workspace.",
+            )
+        return current_user
+
+    return dependency

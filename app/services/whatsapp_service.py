@@ -22,7 +22,7 @@ from app.core.prompts import build_whatsapp_prompt
 from app.services import whatsapp_client
 from app.services.lead_scoring_service import LeadScoringService
 from app.services.llm import get_chat_model
-from app.utils.auth import CurrentUser
+from app.utils.auth import CurrentUser, builder_has_feature
 from app.utils.crypto import decrypt_secret, encrypt_secret, mask_secret
 
 HISTORY_LIMIT = 20                       # messages of context sent to the AI
@@ -137,6 +137,9 @@ class WhatsAppService:
                     continue
                 if not self.is_signature_valid(account, raw_body, signature):
                     print(f"WhatsApp webhook signature mismatch for account {account['id']}; ignoring.")
+                    continue
+                if not builder_has_feature(account["builder_id"], "whatsapp_bot"):
+                    print(f"WhatsApp feature disabled for builder {account['builder_id']}; ignoring.")
                     continue
 
                 contacts = {c.get("wa_id"): (c.get("profile") or {}).get("name") for c in value.get("contacts") or []}

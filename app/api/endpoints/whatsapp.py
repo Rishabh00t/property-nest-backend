@@ -4,7 +4,7 @@ Public (called by Meta):
   GET  /whatsapp/webhook   - webhook verification handshake
   POST /whatsapp/webhook   - incoming messages + delivery statuses, all builders
 
-Builder workspace (Supabase bearer token, role admin):
+Builder workspace (Supabase bearer token, role admin, "whatsapp_bot" feature on):
   GET/PUT/DELETE /whatsapp/account, POST /whatsapp/account/test, ...
   GET /whatsapp/conversations, GET/POST .../{id}/messages, PATCH .../{id}
 
@@ -22,9 +22,12 @@ from starlette.concurrency import run_in_threadpool
 from app.core.config import settings
 from app.schemas.whatsapp import AgentMessageRequest, ConversationStatusUpdate, WhatsAppAccountUpdate
 from app.services.whatsapp_service import ConflictError, whatsapp_service
-from app.utils.auth import CurrentUser, require_builder
+from app.utils.auth import CurrentUser, require_feature
 
 whatsapp_router = APIRouter()
+
+# Builder routes need the WhatsApp feature enabled by the super admin.
+require_whatsapp = require_feature("whatsapp_bot")
 
 
 def _webhook_url(request: Request) -> str:
@@ -84,29 +87,29 @@ async def receive_webhook(request: Request):
 
 
 @whatsapp_router.get("/account")
-def get_account(request: Request, user: CurrentUser = Depends(require_builder)):
+def get_account(request: Request, user: CurrentUser = Depends(require_whatsapp)):
     return _call(whatsapp_service.get_account, user, _webhook_url(request))
 
 
 @whatsapp_router.put("/account")
-def save_account(payload: WhatsAppAccountUpdate, request: Request, user: CurrentUser = Depends(require_builder)):
+def save_account(payload: WhatsAppAccountUpdate, request: Request, user: CurrentUser = Depends(require_whatsapp)):
     return _call(
         whatsapp_service.save_account, user, payload.model_dump(exclude_unset=True), _webhook_url(request)
     )
 
 
 @whatsapp_router.post("/account/test")
-def test_account(request: Request, user: CurrentUser = Depends(require_builder)):
+def test_account(request: Request, user: CurrentUser = Depends(require_whatsapp)):
     return _call(whatsapp_service.test_connection, user, _webhook_url(request))
 
 
 @whatsapp_router.post("/account/rotate-verify-token")
-def rotate_verify_token(request: Request, user: CurrentUser = Depends(require_builder)):
+def rotate_verify_token(request: Request, user: CurrentUser = Depends(require_whatsapp)):
     return _call(whatsapp_service.rotate_verify_token, user, _webhook_url(request))
 
 
 @whatsapp_router.delete("/account")
-def disconnect_account(user: CurrentUser = Depends(require_builder)):
+def disconnect_account(user: CurrentUser = Depends(require_whatsapp)):
     _call(whatsapp_service.disconnect, user)
     return {"success": True}
 
@@ -117,23 +120,23 @@ def disconnect_account(user: CurrentUser = Depends(require_builder)):
 @whatsapp_router.get("/conversations")
 def list_conversations(
     status: str | None = Query(None, pattern="^(bot|human|closed)$"),
-    user: CurrentUser = Depends(require_builder),
+    user: CurrentUser = Depends(require_whatsapp),
 ):
     return _call(whatsapp_service.list_conversations, user, status)
 
 
 @whatsapp_router.get("/conversations/{conversation_id}/messages")
-def get_messages(conversation_id: str, user: CurrentUser = Depends(require_builder)):
+def get_messages(conversation_id: str, user: CurrentUser = Depends(require_whatsapp)):
     return _call(whatsapp_service.get_messages, user, conversation_id)
 
 
 @whatsapp_router.post("/conversations/{conversation_id}/messages")
-def send_message(conversation_id: str, payload: AgentMessageRequest, user: CurrentUser = Depends(require_builder)):
+def send_message(conversation_id: str, payload: AgentMessageRequest, user: CurrentUser = Depends(require_whatsapp)):
     return _call(whatsapp_service.send_agent_message, user, conversation_id, payload.body)
 
 
 @whatsapp_router.patch("/conversations/{conversation_id}")
 def update_conversation(
-    conversation_id: str, payload: ConversationStatusUpdate, user: CurrentUser = Depends(require_builder)
+    conversation_id: str, payload: ConversationStatusUpdate, user: CurrentUser = Depends(require_whatsapp)
 ):
     return _call(whatsapp_service.set_conversation_status, user, conversation_id, payload.status)
